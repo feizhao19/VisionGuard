@@ -1,0 +1,11 @@
+# Exclude all files in the data folder
+data/
+
+# Exclude all files in the results folder
+results/
+
+# Exclude Jupyter Notebook checkpoints
+**/.ipynb_checkpoints/
+
+# Exclude PyTorch weight files
+*.pt
