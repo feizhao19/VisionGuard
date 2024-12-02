@@ -1,6 +1,5 @@
 # Exclude all files in the data folder
 data/
-
 # Exclude all files in the results folder
 results/
 
@@ -9,3 +8,4 @@ results/
 
 # Exclude PyTorch weight files
 *.pt
+
