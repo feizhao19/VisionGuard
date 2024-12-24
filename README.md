@@ -1,4 +1,4 @@
-init# MH_Post_Hoc: Mitigating Image Captioning Hallucinations in Vision-Language Models  
+# MH_Post_Hoc: Mitigating Image Captioning Hallucinations in Vision-Language Models  
 ### *A Post-Hoc Test-Time Adaptation Approach with Reinforcement Learning*
 
 This repository contains the code for our paper **"Mitigating Image Captioning Hallucinations in Vision-Language Models: A Post-Hoc Test-Time Adaptation Approach with Reinforcement Learning"**, submitted to **ICME 2025**. Our approach introduces a lightweight, reinforcement learning-based method to dynamically mitigate hallucinations in Vision-Language Models (VLMs) during inference, operating as a post-hoc adaptation mechanism.
@@ -6,6 +6,12 @@ This repository contains the code for our paper **"Mitigating Image Captioning H
 ## Overview
 
 Vision-Language Models (VLMs) are prone to hallucinations in their generated captions, where descriptions deviate from the actual visual content. This project proposes a novel **post-hoc Test-Time Adaptation (TTA)** framework, leveraging **reinforcement learning (RL)** to iteratively refine captions during inference. Our method eliminates the need for retraining or additional models, offering an efficient solution to improve caption accuracy and factual consistency.
+
+
+## Overview
+
+![Overall Framework](./image/overall.png)
+
 
 ### Key Features
 
