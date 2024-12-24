@@ -19,17 +19,6 @@ Vision-Language Models (VLMs) are prone to hallucinations in their generated cap
 
 ---
 
-## Repository Structure
-
-MH_Post_Hoc/
-├── AMBER/           # Evaluation code for the AMBER dataset
-├── model/           # Implementation of TTA for LLaVA and InstructBLIP
-│   ├── blip/        # TTA for InstructBLIP
-│   ├── llava/       # TTA for LLaVA
-├── temp/            # Environment testing scripts
-├── .gitignore       # Git ignore file
-├── README.md        # Documentation
-
 
 ### Details on Folders
 - **AMBER:** Contains evaluation scripts for the AMBER dataset, which serves as the benchmark for generative tasks.
