@@ -203,4 +203,3 @@ dependencies:
       - widgetsnbextension==4.0.13
       - xxhash==3.5.0
       - yarl==1.9.7
-prefix: /home/larry5/miniconda3/envs/transformers
