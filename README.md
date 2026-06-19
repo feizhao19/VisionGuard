@@ -21,7 +21,7 @@ VisionGuard decomposes inference into three cooperating roles:
 | Role | Component | Responsibility |
 |------|-----------|------------------|
 | **Generator** | VLM (LLaVA / InstructBLIP) | Produces multiple caption candidates via beam search |
-| **Critic** | VisionGuard Reward Model (Customized CLIP) | Scores each candidate on semantic alignment and hallucination likelihood |
+| **Critic** | VisionGuard Reward Model (Customized CLIP) | Scores each candidate on semantic alignment and non-hallucination likelihood |
 | **Self-Corrector** | RL Policy Optimizer | Applies policy-gradient updates to LayerNorm parameters, then re-generates |
 
 ```
@@ -48,7 +48,7 @@ The Critic combines two complementary signals:
 - **SAS (Semantic Alignment Score):** CLIP-based image–text alignment.
 - **NHP (Non-Hallucination Probability):** Binary hallucination classifier trained with triplet loss on our large-scale synthetic dataset.
 
-We construct a large-scale synthetic dataset from real image–caption pairs. For each sample, a ground-truth caption is paired with controlled hallucinated variants across three error types—**object** (e.g., *horse* → *donkey*), **attribute** (e.g., *black* → *navy-blue*), and **relation** (e.g., *riding* → *being pulled by*). These visually similar but semantically wrong captions provide hard negatives for triplet-loss training, teaching the Critic to distinguish factual grounding from subtle hallucinations.
+We construct a large-scale synthetic dataset from real image–caption pairs. For each sample, a ground-truth caption is paired with controlled hallucinated variants across three error types: **object** (e.g., *horse* → *donkey*), **attribute** (e.g., *black* → *navy-blue*), and **relation** (e.g., *riding* → *being pulled by*). These visually similar but semantically wrong captions provide hard negatives for triplet-loss training, teaching the Critic to distinguish factual grounding from subtle hallucinations.
 
 ![Synthetic Data Sample](./image/data_sample.jpeg)
 *Example from our synthetic dataset: ground-truth captions (black) vs. object / attribute / relation hallucinations (red / blue / pink).*
@@ -116,7 +116,7 @@ python -m spacy download en_core_web_lg
 | Resource | Purpose |
 |----------|---------|
 | [AMBER](https://github.com/junyangwang0410/AMBER) | Evaluation benchmark (1,004 images) |
-| `clipmodel.pth` | Pre-trained VisionGuard Critic weights (not included; place under project root or update path in notebooks) |
+| `clipmodel.pth` | Pre-trained VisionGuard Critic weights (not included in this repo; **please contact the authors to obtain the weights**, then place under project root or update the path in notebooks) |
 | PixelProse subset | Used to train the Critic (training script coming soon) |
 
 ### 3. Run Self-Correction
