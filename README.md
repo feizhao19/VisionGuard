@@ -34,7 +34,7 @@ Image + Prompt
 └─────────────┘                         └────────┬─────────┘
      ▲                                           │
      │         policy-gradient update            │
-     └──────── Self-Corrector (RL-TTA) ◄────────┘
+     └──────── Self-Corrector (RL-TTA)  ◄────────┘
                     (repeat K steps)
      │
      ▼
