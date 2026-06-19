@@ -2,7 +2,7 @@
 
 ### *RL-based Agentic Self-Correction and Hallucination Mitigation for Vision-Language Models*
 
-VisionGuard is an inference-time guardrail framework for Vision-Language Models (VLMs). It treats caption generation as a closed-loop agentic process: a **Generator** proposes candidates, a **Critic** scores factual consistency and visual alignment, and a **Self-Correction** module iteratively refines the VLM policy via reinforcement learning. Conceptually, our RL formulation—sampling a group of candidates and updating the policy with relative rewards—is closely aligned with [Group Relative Policy Optimization (GRPO)](https://arxiv.org/abs/2402.03300), though VisionGuard was **proposed and tested roughly 10 months earlier than GRPO**.
+VisionGuard is an inference-time framework for Vision-Language Models (VLMs). It treats VQA/Captioning generation as a closed-loop agentic process: a **Generator** proposes candidates, a **Critic** scores factual consistency and visual alignment, and a **Self-Correction** module iteratively refines the VLM policy via reinforcement learning. Conceptually, our RL formulation, sampling a group of candidates and updating the policy with relative rewards, is similiar to [Group Relative Policy Optimization (GRPO)](https://arxiv.org/abs/2402.03300), though our VisionGuard was **proposed and tested roughly 10 months earlier than GRPO**.
 
 ---
 
