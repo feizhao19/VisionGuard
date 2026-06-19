@@ -3,6 +3,15 @@ data/
 # Exclude all files in the results folder
 results/
 
+# Exclude local secrets and large artifacts
+**/hf_token.txt
+clipmodel.pth
+cache/
+
+# Exclude Python cache
+**/__pycache__/
+*.pyc
+
 # Exclude Jupyter Notebook checkpoints
 **/.ipynb_checkpoints/
 
