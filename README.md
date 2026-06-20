@@ -46,7 +46,9 @@ Image + Prompt
 The Critic combines two complementary signals:
 
 - **SAS (Semantic Alignment Score):** CLIP-based image–text alignment.
-- **NHP (Non-Hallucination Probability):** Binary hallucination classifier trained with triplet loss on our large-scale synthetic dataset.
+- **NHP (Non-Hallucination Probability):** Binary hallucination classifier trained with triplet loss on our [large-scale synthetic dataset](#synthetic-dataset).
+
+#### Synthetic Dataset
 
 We construct a large-scale synthetic dataset from real image–caption pairs. For each sample, a ground-truth caption is paired with controlled hallucinated variants across three error types: **object** (e.g., *horse* → *donkey*), **attribute** (e.g., *black* → *navy-blue*), and **relation** (e.g., *riding* → *being pulled by*). These visually similar but semantically wrong captions provide hard negatives for triplet-loss training, teaching the Critic to distinguish factual grounding from subtle hallucinations.
 
