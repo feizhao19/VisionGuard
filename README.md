@@ -55,8 +55,6 @@ We construct a large-scale synthetic dataset from real image–caption pairs. Fo
 ![Synthetic Data Sample](./image/data_sample.jpeg)
 *Example from our synthetic dataset: ground-truth captions (black) vs. object / attribute / relation hallucinations (red / blue / pink).*
 
-We designed an automated annotation quality evaluation pipeline that measures image–text alignment between visual fields and their labeled text (e.g., amount, date). Cases below a similarity threshold are flagged for review, helping reduce subjectivity and human error during data annotation and dataset creation.
-
 ### Why "Agentic Self-Correction"?
 
 Unlike one-shot decoding, VisionGuard runs a **multi-step perceive → generate → evaluate → correct** loop at inference time. Each step:
