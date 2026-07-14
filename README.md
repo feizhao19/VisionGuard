@@ -83,8 +83,9 @@ Parameters are **reset per image** (episodic adaptation), so correction is sampl
 ```
 VisionGuard/
 ├── visionguard/            # Shared Python package
-│   └── critic/
-│       └── custom_clip.py  # VisionGuard Critic (CustomCLIPModel)
+│   ├── critic/
+│   │   └── custom_clip.py  # VisionGuard Critic (CustomCLIPModel)
+│   └── vision_cache.py     # Reuse frozen visual tokens across TTA steps
 ├── AMBER/                  # Benchmark evaluation (CHAIR, Cover, Hal, QA metrics)
 ├── model/
 │   ├── blip/               # VisionGuard pipeline for InstructBLIP
@@ -94,6 +95,8 @@ VisionGuard/
 ├── image/                  # Framework diagram and figures
 └── temp/                   # Environment and dataset smoke tests
 ```
+
+TTA notebooks encode each image's vision-tower outputs **once**, then reuse those continuous visual tokens across RL steps. Language-model prefills still re-run after each LayerNorm update (image-prefix K/V is intentionally not reused across steps).
 
 ---
 
@@ -166,6 +169,7 @@ If you use VisionGuard in your research, please cite:
 
 ## Roadmap
 
+- [x] Cache frozen visual tokens across TTA steps (`visionguard.vision_cache`)
 - [ ] Extract notebooks into an installable `visionguard` Python package
 - [ ] Add YAML configs and CLI entry points
 - [ ] Release Critic training code (PixelProse triplet loss)
