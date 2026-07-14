@@ -75,6 +75,28 @@ Parameters are **reset per image** (episodic adaptation), so correction is sampl
 - **Lightweight** — Updates only LayerNorm γ in the language backbone.
 - **Post-hoc / plug-and-play** — No full-model retraining; works with off-the-shelf VLMs.
 - **Custom CLIP Critic** — Learnable query tokens + cross-attention for hallucination scoring.
+- **Visual-token caching** — Encode each image once with the frozen vision tower; reuse continuous visual tokens across TTA steps.
+
+---
+
+## Efficiency: Caching Visual Tokens
+
+Naive TTA would re-run the vision encoder on every generate / teacher-forcing pass across `K` RL steps. Because the vision tower (and LLaVA projector) is **frozen**, those continuous visual tokens are identical for a given image—so we compute them **once** and reuse them.
+
+| What we cache | What we do *not* cache |
+|---------------|------------------------|
+| LLaVA: ViT + projector outputs (visual tokens before the LLM) | LLM K/V for the image prefix across RL steps |
+| InstructBLIP: ViT patch embeds | Q-Former (text-conditioned) and LM prefills |
+
+After each LayerNorm update, image-prefix K/V in the language model becomes stale, so LM prefills still re-run. Helpers live in `visionguard/vision_cache.py` and are wired into both TTA notebooks.
+
+```
+per image:
+  pixel_values ──► vision tower (+ projector) ──► cached visual tokens   (once)
+
+per TTA step:
+  cached visual tokens + prompt ──► LM prefill / generate / RL update    (re-run)
+```
 
 ---
 
@@ -83,8 +105,9 @@ Parameters are **reset per image** (episodic adaptation), so correction is sampl
 ```
 VisionGuard/
 ├── visionguard/            # Shared Python package
-│   └── critic/
-│       └── custom_clip.py  # VisionGuard Critic (CustomCLIPModel)
+│   ├── critic/
+│   │   └── custom_clip.py  # VisionGuard Critic (CustomCLIPModel)
+│   └── vision_cache.py     # Reuse frozen visual tokens across TTA steps
 ├── AMBER/                  # Benchmark evaluation (CHAIR, Cover, Hal, QA metrics)
 ├── model/
 │   ├── blip/               # VisionGuard pipeline for InstructBLIP
@@ -166,6 +189,7 @@ If you use VisionGuard in your research, please cite:
 
 ## Roadmap
 
+- [x] Cache frozen visual tokens across TTA steps (`visionguard.vision_cache`)
 - [ ] Extract notebooks into an installable `visionguard` Python package
 - [ ] Add YAML configs and CLI entry points
 - [ ] Release Critic training code (PixelProse triplet loss)
