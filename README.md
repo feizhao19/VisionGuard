@@ -75,6 +75,28 @@ Parameters are **reset per image** (episodic adaptation), so correction is sampl
 - **Lightweight** — Updates only LayerNorm γ in the language backbone.
 - **Post-hoc / plug-and-play** — No full-model retraining; works with off-the-shelf VLMs.
 - **Custom CLIP Critic** — Learnable query tokens + cross-attention for hallucination scoring.
+- **Visual-token caching** — Encode each image once with the frozen vision tower; reuse continuous visual tokens across TTA steps.
+
+---
+
+## Efficiency: Caching Visual Tokens
+
+Naive TTA would re-run the vision encoder on every generate / teacher-forcing pass across `K` RL steps. Because the vision tower (and LLaVA projector) is **frozen**, those continuous visual tokens are identical for a given image—so we compute them **once** and reuse them.
+
+| What we cache | What we do *not* cache |
+|---------------|------------------------|
+| LLaVA: ViT + projector outputs (visual tokens before the LLM) | LLM K/V for the image prefix across RL steps |
+| InstructBLIP: ViT patch embeds | Q-Former (text-conditioned) and LM prefills |
+
+After each LayerNorm update, image-prefix K/V in the language model becomes stale, so LM prefills still re-run. Helpers live in `visionguard/vision_cache.py` and are wired into both TTA notebooks.
+
+```
+per image:
+  pixel_values ──► vision tower (+ projector) ──► cached visual tokens   (once)
+
+per TTA step:
+  cached visual tokens + prompt ──► LM prefill / generate / RL update    (re-run)
+```
 
 ---
 
@@ -95,8 +117,6 @@ VisionGuard/
 ├── image/                  # Framework diagram and figures
 └── temp/                   # Environment and dataset smoke tests
 ```
-
-TTA notebooks encode each image's vision-tower outputs **once**, then reuse those continuous visual tokens across RL steps. Language-model prefills still re-run after each LayerNorm update (image-prefix K/V is intentionally not reused across steps).
 
 ---
 
