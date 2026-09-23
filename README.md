@@ -1,14 +1,12 @@
 # VisionGuard
 
-### *RL-based Agentic Self-Correction and Hallucination Mitigation for Vision-Language Models*
+### *Test-Time RL for Hallucination Mitigation in Vision-Language Models*
 
-VisionGuard is an inference-time framework for Vision-Language Models (VLMs). It treats VQA/Captioning generation as a closed-loop agentic process: a **Generator** proposes candidates, a **Critic** scores factual consistency and visual alignment, and a **Self-Correction** module iteratively refines the VLM policy via reinforcement learning. Conceptually, our RL formulation, sampling a group of candidates and updating the policy with relative rewards, is similiar to [Group Relative Policy Optimization (GRPO)](https://arxiv.org/abs/2402.03300), though our VisionGuard was **proposed and tested roughly 10 months earlier than GRPO**.
+[**Paper (MIPR 2025)**](https://doi.org/10.1109/MIPR67560.2025.00054) · [**Demo**](https://feizhao19.github.io/#project-vlm-hallucination)
 
----
+VisionGuard is a test-time reinforcement learning system that reduces hallucination in pretrained Vision-Language Models (VLMs) through inference-time self-correction. For each image, the VLM policy samples a group of candidate captions, a learned **verifier** scores them for visual grounding and hallucination, and the policy is updated with group-relative rewards. Only **0.003% of the policy's parameters** (LayerNorm γ) are tuned, and the backbone is never retrained. This lowers the AMBER **hallucination rate by 15.4%** on LLaVA-1.5-7B.
 
-## Overview
-
-Vision-Language Models often produce captions that describe objects, attributes, or relations not present in the image. VisionGuard mitigates these hallucinations at **test time** through a lightweight, RL-driven self-correction loop that adapts only a tiny fraction of VLM parameters per sample, improving factual grounding.
+The key finding is a **reward-hacking gap**: CLIP's alignment score alone gives a high reward to a caption that is mostly correct but contains a single localized hallucination. VisionGuard closes this gap with a dedicated **Non-Hallucination Probability (NHP)** signal. Conceptually, the RL formulation (sample a group of candidates, then update the policy with relative rewards) is similar to the RL recipe popularized by [DeepSeek-R1](https://arxiv.org/abs/2501.12948). VisionGuard was proposed and tested before DeepSeek-R1 was published.
 
 ![VisionGuard Framework](./image/overall.png)
 
@@ -20,83 +18,55 @@ VisionGuard decomposes inference into three cooperating roles:
 
 | Role | Component | Responsibility |
 |------|-----------|------------------|
-| **Generator** | VLM (LLaVA / InstructBLIP) | Produces multiple caption candidates via beam search |
-| **Critic** | VisionGuard Reward Model (Customized CLIP) | Scores each candidate on semantic alignment and non-hallucination likelihood |
-| **Self-Corrector** | RL Policy Optimizer | Applies policy-gradient updates to LayerNorm parameters, then re-generates |
+| **Policy / Generator** | VLM (LLaVA / InstructBLIP) | Samples a group of caption candidates via beam search |
+| **Verifier / Critic** | Frozen CLIP + NHP head | Scores each candidate on semantic alignment (SAS) and non-hallucination probability (NHP) |
+| **Self-Corrector** | RL Policy Optimizer | Applies policy-gradient updates to LayerNorm γ, then re-generates |
 
 ```
 Image + Prompt
      │
      ▼
-┌─────────────┐     beam candidates     ┌──────────────────┐
-│  Generator  │ ──────────────────────► │     Critic       │
-│  (VLM)      │                         │  SAS + NHP score │
-└─────────────┘                         └────────┬─────────┘
-     ▲                                           │
-     │         policy-gradient update            │
-     └──────── Self-Corrector (RL-TTA)  ◄────────┘
+┌─────────────┐    group of candidates   ┌──────────────────┐
+│   Policy    │ ───────────────────────► │    Verifier      │
+│   (VLM)     │                          │  SAS + NHP score │
+└─────────────┘                          └────────┬─────────┘
+     ▲                                            │ group-relative rewards
+     │          policy-gradient update            │
+     └──────── Self-Corrector (test-time RL) ◄────┘
                     (repeat K steps)
      │
      ▼
   Corrected Caption
 ```
 
-### Dual Reward Signal
+Each step runs a **generate → verify → update** loop:
+1. Sample a group of candidate captions.
+2. Score each one with the verifier (SAS + NHP).
+3. Update the policy (LayerNorm γ) with group-relative rewards.
+4. Repeat for a fixed step budget, then reset the parameters for the next image.
 
-The Critic combines two complementary signals:
+### Synthetic Dataset
 
-- **SAS (Semantic Alignment Score):** CLIP-based image–text alignment.
-- **NHP (Non-Hallucination Probability):** Binary hallucination classifier trained with triplet loss on our [large-scale synthetic dataset](#synthetic-dataset).
-
-#### Synthetic Dataset
-
-We construct a large-scale synthetic dataset from real image–caption pairs. For each sample, a ground-truth caption is paired with controlled hallucinated variants across three error types: **object** (e.g., *horse* → *donkey*), **attribute** (e.g., *black* → *navy-blue*), and **relation** (e.g., *riding* → *being pulled by*). These visually similar but semantically wrong captions provide hard negatives for triplet-loss training, teaching the Critic to distinguish factual grounding from subtle hallucinations.
+To train the NHP verifier, we build a large-scale synthetic dataset from real image–caption pairs. Each correct caption is paired with a version containing a **single or combined** hallucination, generated with **Llama 3.2**, at three levels: **object** (e.g., *horse* → *donkey*), **attribute** (e.g., *black* → *navy-blue*), and **relation** (e.g., *riding* → *being pulled by*). These visually plausible but factually wrong captions are the hard negatives for contrastive (triplet-loss) training. They teach the verifier to separate grounded captions from subtle hallucinations.
 
 ![Synthetic Data Sample](./image/data_sample.jpeg)
 *Example from our synthetic dataset: ground-truth captions (black) vs. object / attribute / relation hallucinations (red / blue / pink).*
-
-### Why "Agentic Self-Correction"?
-
-Unlike one-shot decoding, VisionGuard runs a **multi-step perceive → generate → evaluate → correct** loop at inference time. Each step:
-1. Generates candidate actions (captions).
-2. Receives structured feedback from the Critic.
-3. Updates the policy (LayerNorm γ, ~0.003% of parameters).
-4. Repeats until convergence or a fixed step budget.
-
-Parameters are **reset per image** (episodic adaptation), so correction is sample-specific and leaves no permanent drift in the base VLM.
 
 ---
 
 ## Key Features
 
-- **RL-based self-correction** — Policy-gradient test-time adaptation (TTA) with dual rewards.
-- **Agentic closed loop** — Generator, Critic, and Self-Corrector roles at inference.
-- **Hallucination mitigation** — Reduces CHAIR by **15.4%** (LLaVA-7B) and **17.3%** (InstructBLIP).
-- **Lightweight** — Updates only LayerNorm γ in the language backbone.
-- **Post-hoc / plug-and-play** — No full-model retraining; works with off-the-shelf VLMs.
-- **Custom CLIP Critic** — Learnable query tokens + cross-attention for hallucination scoring.
-- **Visual-token caching** — Encode each image once with the frozen vision tower; reuse continuous visual tokens across TTA steps.
+- **Reward-hacking-aware verifier**: the NHP signal closes CLIP's blind spot for localized hallucinations (a further 4.8% reduction).
+- **Hallucination mitigation**: reduces the AMBER hallucination rate by **15.4%** (LLaVA-1.5-7B) and **17.3%** (InstructBLIP).
+- **Lightweight**: tunes only LayerNorm γ (~0.003% of parameters) in the language backbone.
+- **Plug-and-play**: works with off-the-shelf VLMs.
+- **Visual-token caching**: encodes each image once with the frozen vision tower and reuses the visual tokens across RL steps.
 
 ---
 
-## Efficiency: Caching Visual Tokens
+## Limitations
 
-Naive TTA would re-run the vision encoder on every generate / teacher-forcing pass across `K` RL steps. Because the vision tower (and LLaVA projector) is **frozen**, those continuous visual tokens are identical for a given image—so we compute them **once** and reuse them.
-
-| What we cache | What we do *not* cache |
-|---------------|------------------------|
-| LLaVA: ViT + projector outputs (visual tokens before the LLM) | LLM K/V for the image prefix across RL steps |
-| InstructBLIP: ViT patch embeds | Q-Former (text-conditioned) and LM prefills |
-
-After each LayerNorm update, image-prefix K/V in the language model becomes stale, so LM prefills still re-run. Helpers live in `visionguard/vision_cache.py` and are wired into both TTA notebooks.
-
-```
-per image:
-  pixel_values ──► vision tower (+ projector) ──► cached visual tokens   (once)
-
-per TTA step:
-  cached visual tokens + prompt ──► LM prefill / generate / RL update    (re-run)
-```
+- **No explicit KL penalty.** Drift from the base model is limited implicitly (LayerNorm-only updates, a small step budget, per-image reset) rather than by a KL term.
 
 ---
 
@@ -106,8 +76,8 @@ per TTA step:
 VisionGuard/
 ├── visionguard/            # Shared Python package
 │   ├── critic/
-│   │   └── custom_clip.py  # VisionGuard Critic (CustomCLIPModel)
-│   └── vision_cache.py     # Reuse frozen visual tokens across TTA steps
+│   │   └── custom_clip.py  # VisionGuard verifier (CustomCLIPModel)
+│   └── vision_cache.py     # Reuse frozen visual tokens across RL steps
 ├── AMBER/                  # Benchmark evaluation (CHAIR, Cover, Hal, QA metrics)
 ├── model/
 │   ├── blip/               # VisionGuard pipeline for InstructBLIP
@@ -141,8 +111,8 @@ python -m spacy download en_core_web_lg
 | Resource | Purpose |
 |----------|---------|
 | [AMBER](https://github.com/junyangwang0410/AMBER) | Evaluation benchmark (1,004 images) |
-| `clipmodel.pth` | Pre-trained VisionGuard Critic weights (not included in this repo; **please contact the authors to obtain the weights**, then place under project root or update the path in notebooks) |
-| PixelProse subset | Used to train the Critic (training script coming soon) |
+| `clipmodel.pth` | Pre-trained VisionGuard verifier weights (not included in this repo; **please contact the authors to obtain the weights**, then place them under the project root or update the path in the notebooks) |
+| PixelProse subset | Source image–caption pairs for the synthetic verifier-training data (training script coming soon) |
 
 ### 3. Run Self-Correction
 
@@ -163,6 +133,27 @@ python AMBER/inference.py \
 
 ---
 
+## Efficiency: Caching Visual Tokens
+
+Naive test-time RL would re-run the vision encoder on every generate / teacher-forcing pass across `K` RL steps. Because the vision tower (and LLaVA projector) is **frozen**, those continuous visual tokens are identical for a given image, so we compute them **once** and reuse them.
+
+| What we cache | What we do *not* cache |
+|---------------|------------------------|
+| LLaVA: ViT + projector outputs (visual tokens before the LLM) | LLM K/V for the image prefix across RL steps |
+| InstructBLIP: ViT patch embeds | Q-Former (text-conditioned) and LM prefills |
+
+After each LayerNorm update, the image-prefix K/V in the language model becomes stale, so LM prefills still re-run. The helpers live in `visionguard/vision_cache.py` and are wired into both notebooks.
+
+```
+per image:
+  pixel_values ──► vision tower (+ projector) ──► cached visual tokens   (once)
+
+per RL step:
+  cached visual tokens + prompt ──► LM prefill / generate / RL update    (re-run)
+```
+
+---
+
 ## Supported Models
 
 | Model | HuggingFace ID | Status |
@@ -178,10 +169,12 @@ If you use VisionGuard in your research, please cite:
 
 ```bibtex
 @inproceedings{zhao2025visionguard,
-  title={Mitigating Image Captioning Hallucinations in Vision-Language Models: A Post-Hoc Test-Time Adaptation Approach with Reinforcement Learning},
-  author={Zhao, Fei and others},
-  booktitle={IEEE International Conference on Multimedia and Expo (ICME)},
-  year={2025}
+  author={Zhao, Fei and Zhang, Chengcui and Zhang, Runlin and Wang, Tianyang and Li, Xi},
+  booktitle={2025 IEEE 8th International Conference on Multimedia Information Processing and Retrieval (MIPR)},
+  title={Mitigating Image Captioning Hallucinations in Vision-Language Models},
+  year={2025},
+  pages={297--302},
+  doi={10.1109/MIPR67560.2025.00054}
 }
 ```
 
@@ -189,10 +182,10 @@ If you use VisionGuard in your research, please cite:
 
 ## Roadmap
 
-- [x] Cache frozen visual tokens across TTA steps (`visionguard.vision_cache`)
+- [x] Cache frozen visual tokens across RL steps (`visionguard.vision_cache`)
 - [ ] Extract notebooks into an installable `visionguard` Python package
 - [ ] Add YAML configs and CLI entry points
-- [ ] Release Critic training code (PixelProse triplet loss)
+- [ ] Release verifier training code (synthetic hard negatives + triplet loss)
 - [ ] Explicit verbal self-correction prompts (generate → critique → revise)
 - [ ] Extend to VQA, grounding, and newer VLMs (LLaVA-NeXT, Qwen-VL, Llama 3.2 Vision)
 
